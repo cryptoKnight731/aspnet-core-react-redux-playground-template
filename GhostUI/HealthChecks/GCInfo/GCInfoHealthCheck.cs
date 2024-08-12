@@ -16,14 +16,14 @@ namespace GhostUI.HealthChecks
             _options = options;
         }
 
-        public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default(CancellationToken))
+        public Task<HealthCheckResult> CheckHealthAsync(HealthCheckContext context, CancellationToken cancellationToken = default)
         {
-            var options = _options.Get(context.Registration.Name);
-
             // This example will report degraded status if the application is using more than the configured amount of memory (1gb by default).
-            // Additionally we include some GC info in the reported diagnostics.
+            // Additionally, we include some GC info in the reported diagnostics.
+            var options = _options.Get(context.Registration.Name);
             var allocated = GC.GetTotalMemory(forceFullCollection: false);
-            var data = new Dictionary<string, object>()
+
+            var data = new Dictionary<string, object>
             {
                 { "Allocated", allocated },
                 { "Gen0Collections", GC.CollectionCount(0) },
@@ -33,10 +33,12 @@ namespace GhostUI.HealthChecks
 
             // Report failure if the allocated memory is >= the threshold.
             // Using context.Registration.FailureStatus means that the application developer can configure how they want failures to appear.
-            var result = allocated >= options.Threshold ? context.Registration.FailureStatus : HealthStatus.Healthy;
+            var status = allocated >= options.Threshold
+                ? context.Registration.FailureStatus
+                : HealthStatus.Healthy;
 
             return Task.FromResult(new HealthCheckResult(
-                result,
+                status,
                 description: "reports degraded status if allocated bytes >= 1gb",
                 data: data));
         }

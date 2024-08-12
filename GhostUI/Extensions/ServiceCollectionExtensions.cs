@@ -1,9 +1,7 @@
-﻿using Newtonsoft.Json;
+﻿using System;
 using System.IO.Compression;
-using Microsoft.AspNetCore.Mvc;
-using System.Collections.Generic;
 using Microsoft.AspNetCore.Builder;
-using Newtonsoft.Json.Serialization;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.AspNetCore.ResponseCompression;
 
@@ -13,38 +11,30 @@ namespace GhostUI.Extensions
     {
         public static IServiceCollection AddCorsConfig(this IServiceCollection services, string name)
         {
-            services.AddCors(options =>
-                options.AddPolicy(name,
-                    corsBuilder =>
-                        corsBuilder
-                            .AllowAnyOrigin()
-                            .AllowAnyHeader()
-                            .AllowAnyMethod()
-                            .AllowCredentials()));
+            services.AddCors(c => c.AddPolicy(name,
+                options => options.AllowAnyOrigin()
+                    .AllowAnyHeader()
+                    .AllowAnyMethod()));
 
             return services;
         }
 
-        public static IServiceCollection AddMvcConfig(this IServiceCollection services, CompatibilityVersion aspCoreVersion)
+        public static IServiceCollection AddResponseCompressionConfig(
+            this IServiceCollection services,
+            IConfiguration config,
+            CompressionLevel compressionLvl = CompressionLevel.Fastest)
         {
-            services.AddMvc()
-                .SetCompatibilityVersion(aspCoreVersion)
-                .AddJsonOptions(options => {
-                    options.SerializerSettings.NullValueHandling = NullValueHandling.Ignore;
-                    options.SerializerSettings.ContractResolver = new DefaultContractResolver();
-                });
+            var enableForHttps = config.GetValue<bool>("Compression:EnableForHttps");
+            var gzipMimeTypes = config.GetSection("Compression:MimeTypes").Get<string[]>();
 
-            return services;
-        }
-
-        public static IServiceCollection AddResponseCompression_Gzip(this IServiceCollection services, IEnumerable<string> mimeTypes, CompressionLevel compressionLvl, bool enableForHttps = false)
-        {
             services.AddResponseCompression(options => {
-                options.EnableForHttps = enableForHttps;
+                options.Providers.Add<BrotliCompressionProvider>();
                 options.Providers.Add<GzipCompressionProvider>();
-                options.MimeTypes = mimeTypes;
+                options.EnableForHttps = enableForHttps;
+                options.MimeTypes = gzipMimeTypes ?? Array.Empty<string>();
             });
 
+            services.Configure<BrotliCompressionProviderOptions>(options => options.Level = compressionLvl);
             services.Configure<GzipCompressionProviderOptions>(options => options.Level = compressionLvl);
 
             return services;
